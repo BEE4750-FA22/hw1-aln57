@@ -1,0 +1,185 @@
+---
+title: "BEE 4750/5750 Homework 1"
+author: "Audrey Noziere (aln57)"
+date: `j import Dates; Dates.Date(Dates.now())`
+weave_options:
+    term: true
+    cache: off
+    md2pdf:
+        template: "bee4750pdf.tpl"
+    md2html:
+        template: "bee4750html.tpl"
+---
+
+<!-- This setups the environment and installs packages, but doesn't appear in the generated document -->
+<!-- You shouldn't need to modify this -->
+```julia; echo = false; results = "hidden"
+using Pkg
+Pkg.activate(dirname(@__FILE__))
+Pkg.instantiate()
+using Plots 
+using Random 
+using Distributions 
+using StatsPlots 
+```
+
+# Problem 1
+
+## Problem 1.1
+![img](C:\Users\anozi\Desktop\BEE4750\hw1-aln57\Diagram3.png)
+
+## Problem 1.2
+**Explanation**
+*Given that there is 100 m^3/day of waste being generated (at a concentration of 1kg/m^3) we know that the totality of that*
+*waste must be disrtibuted between the three options: Land Disposal, Chemical Treatment, or Untreated*
+* X_1 represents the amount of waste disposed on land. 1/5 of that is going to end back in to the brook
+* X_2 represents the amount of waste going through chemical treatment, the efficiency will help us find the amount going to brook
+* U represents the untreated amount which is going straight to brook
+
+Outline of Constraints
+$$
+\begin{alignat*}{2}
+& &\ X_1+ X_2 + U = 100\\
+&\text{subject to} & \\
+& & X_1 \geq 0\\
+& & X_1 \leq 100\\
+& & X_2 \geq 0 \\
+& & X_2 \leq 100 \\
+& & U \geq 0 \\
+& & U \leq 100 \\
+\end{alignat*}
+$$
+
+*The total amount going to Brook:*
+* This represents the total output from Land Disposal, Chem Treatment, and No Treatment
+* To meet EPA standards the output must be less than or equal to 20 kg/day
+$$
+\begin{alignat*}{2}
+& &\ (LandOutput + ChemOoutput + Uoutput) \leq 20kg/day\\
+&\text{subject to} & \\
+& & LandOutput = (0.2X_1)*1kg/m^3\\
+& & ChemOutput = [(1 - e)X_2]*1kg/m^3 \\
+& & e = 1 - 0.005X_2 \\
+& & UOutput = U*1kg/m^3 \\
+\end{alignat*}
+$$
+*The total Cost of the output:* 
+* This depends on the amount being sent to each option, but will result in the sum of the costs
+$$
+\begin{alignat*}{2}
+& &\ Costs = CostLand + CostChem + CostU\\
+&\text{subject to} & \\
+& & CostLand = (X_1)^2/20\\
+& & CostChem = 1.5X_2\\
+& & CostU = 0 \\
+\end{alignat*}
+$$
+
+
+## Problem 1.3
+**Explanation**
+*The function below calculates the amount of YUK going to the water and the cost*
+*The inputs are:*
+* X_1 
+* X_2 
+*It returns:* 
+* x final amount in kg/day going into Pristine Brook
+* Final Cost
+* Amount untreated (U)
+* X_1
+* X_2
+
+```julia
+function output(X_1, X_2) 
+    land_output = 0.2*X_1*1
+    e = 1 - 0.005*X_2 #efficiency 
+    chem_output = (1-e)*(X_2)*1
+    U = 100 - X_1 - X_2 #untreated amount
+    x = land_output + chem_output + U # x is the final output to water
+    cost = 1.50*X_2 + (X_1^2)/20
+    return x, cost, U, X_1, X_2
+end
+```
+## Problem 1.4
+**Explanation**
+*Below is the code I used to generate 1000 random samples and plot my findings*
+```julia
+
+treatment_samples = [] 
+while length(treatment_samples) < 1000
+    a = rand(0.0:100.0) 
+    b = rand(0.0:100.0) 
+    if a + b <= 100
+        push!(treatment_samples, (a, b)) 
+    end
+end
+
+treatment_output = []
+for i in treatment_samples
+    push!(treatment_output, output(i[1], i[2]))
+end
+
+final_output = [o[1] for o in treatment_output]
+final_costs = [o[2] for o in treatment_output]
+scatter(final_output, final_costs, xlabel="Concentrations to river in kg/day", ylabel = "Costs in Dollars", legend = false, grid = false)
+plot!([20], seriestype="vline")
+```
+
+## Problem 1.5
+**Explanation**
+*I added some code to help me pinpoint the based option in my opinion. 
+* This would be the lowest cost option after meeting the EPA standard
+```julia
+meet_standards = []
+for i in treatment_output
+    if i[1] <= 20 
+        push!(meet_standards, i)
+    end
+end
+
+min_cost = findmin([o[2] for o in meet_standards])
+
+for i in meet_standards
+    if i[2] == min_cost[1]
+    return i
+    end
+end
+```
+
+**Answers**
+**How would you select a treatment plan? How might this plan reflect the perspectives of various interested parties (factory owners, the public, regulatory agencies, etc)?**
+* Based on the plot, I would immediately illiminate any option that lies beyond the horizontal red line. This line represents the EPA standards of 20kg/day which is allowed to be released into the Pristine Brook. Any point beyond this has exceed this limit. Then I would want to choose the point that is the lowest, so closest to the x axis which would represen the lowest cost. Now there are many points that I could choose and what kind of stakeholder I am will influence what option I choose. In terms of factory owner, I would choose the point that minimizes my cost. Assuming I would get fined if I am over the EPA standards, I would likely choose the cheapest option form the left of the red line. If I was the public and I did not have to pay I would chose the option that minimizes the input to Pristine Brooke which is likely a shared resource, possibly used for drinking water or recreationally. From Regulatory Agency's perspective I would be most interested in choosing a solution that lies to the left of the right line, and if I do not have to bare the price any of those points will do (the lower concentrations the better). 
+
+**Did how you set up your numerical experiment in Problem 1.5 influence your conclusions?**
+* I think an important thing to consider is the way in which the variables are chosen. The way my function is set up is that it focuses on X_1 and X_2 and depending on what values are randomized for them, U is chosen. This could have an influence on the solutions that my function outputs. Additionally, X_1 is chosen before X_2 and then U. 
+* From lookig at the graph, most of the solutions that are found are concnetrated near the center bottom of the graph and there are very few solutions on the left size, this makes me think that my function influenced my solutions by finding more lower cost solutions than low concentration solutions
+* The sample size could also have an influence on my conclusions. While I chose 1000 samples, I could increase my sample size and get a better view of all the solutions
+
+**Might they have changed with a different experimental design?**
+* It would be interesting to see the difference in solution if I switch up which varable is randomly chosen first. Finding a way to randomize if X_1 , X_2 or U are chosen first could make my model stronger by elliminating any bias between variables. 
+* Smaller sample size would give a more limitted view of the solutions, but a large sample size could be more encompasing of all the solutions and particularly finding the best solution. 
+
+## Problem 1.6
+**Answer**
+* Something that could be interesting to investigate more is finding the ideal cost of a Fine from the EPA to the Plastic Company to ensure that they stay below EPA standards. For example, if the Fine is set to 100 dollars for an exceedence, but it cost the company 120 dollars to reduce their output from 22kg/day to 19.9 kg/day they will be incentivized to bare the fine rather than treat the waste. Hence to stengthen the model, we could look into balancing the Fine with the cost of treatment so that the company would always rather treat the waste rather than pay the fine.
+
+*Some important assumption that were made in this model :*
+* is that Cheap Plastic Products is the only source of YUK to Pristine Brook. 
+* YUK does not degrade with time 
+* The Land Disposal doesn't runoff into Pristine Brook later on in time
+* YUK does not react with elements in Pristine Brook to decompose
+* the Costs displayed are only the direct costs of land disposal and chemical disposal but do not incoperate indirect costs of pollution
+
+```
+# References
+* https://docs.julialang.org/en/v1/base/collections/#Base.findmax
+* https://discourse.julialang.org/t/what-is-the-syntax-for-vline-in-plots-jl/1718/8
+* https://docs.julialang.org/en/v1/stdlib/Random/
+* https://discourse.julialang.org/t/how-to-create-a-random-uniform-distribution-between-but-excluding-0-and-10/21908
+* https://docs.julialang.org/en/v1/manual/mathematical-operations/
+* https://stackoverflow.com/questions/27827249/julia-concatenate-string-and-integer
+
+
+
+
+
